@@ -1,0 +1,134 @@
+import java.util.Random;
+
+class ProductionLine {
+    private int resource1;
+    private int resource2;
+    private int finishedProducts;
+    private int resource1Threshold;
+    private int resource2Threshold;
+    private Random rand;
+
+    public ProductionLine(int resource1Threshold, int resource2Threshold) {
+        this.resource1 = 0;
+        this.resource2 = 0;
+        this.finishedProducts = 0;
+        this.resource1Threshold = resource1Threshold;
+        this.resource2Threshold = resource2Threshold;
+        this.rand = new Random();
+    }
+
+    public synchronized void produce() {
+        while (resource1 < resource1Threshold || resource2 < resource2Threshold) {
+            try {
+                wait();
+                System.out.println("wytworzono produkt1");
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        resource1 -= resource1Threshold;
+        resource2 -= resource2Threshold;
+        int productionTime = rand.nextInt(1000);
+        try {
+            Thread.sleep(productionTime);
+            System.out.println("wytworzono produkt2");
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        finishedProducts += 1;
+        notifyAll();
+    }
+
+    public synchronized void addResource1(int amount) {
+        resource1 += amount;
+        System.out.println("dostarczono1");
+        notifyAll();
+    }
+
+    public synchronized void addResource2(int amount) {
+        resource2 += amount;
+        System.out.println("dostarczono2");
+        notifyAll();
+    }
+
+    public synchronized int takeFinishedProducts(int amount) {
+        while (finishedProducts < amount) {
+            try {
+                wait();
+
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        finishedProducts -= amount;
+        notifyAll();
+        System.out.println("koniec pordukcji czeakmy na dostawe");
+        return amount;
+
+    }
+}
+
+class SupplyTruck {
+    private ProductionLine line;
+    private Random rand;
+
+    public SupplyTruck(ProductionLine line) {
+        this.line = line;
+        this.rand = new Random();
+    }
+
+    public void run() {
+        while (true) {
+            int resource1Amount = rand.nextInt(100);
+            int resource2Amount = rand.nextInt(100);
+            line.addResource1(resource1Amount);
+            line.addResource2(resource2Amount);
+            int supplyTime = rand.nextInt(1000);
+            try {
+                Thread.sleep(supplyTime);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+
+class ShippingTruck {
+    private ProductionLine line;
+    private Random rand;
+
+    public ShippingTruck(ProductionLine line) {
+        this.line = line;
+        this.rand = new Random();
+    }
+
+    public void run() {
+        while (true) {
+            int packageAmount = rand.nextInt(10);
+            line.takeFinishedProducts(packageAmount);
+            int shippingTime = rand.nextInt(1000);
+            try {
+                Thread.sleep(shippingTime);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+
+public class ProductionSimulation {
+    public static void main(String[] args) {
+        ProductionLine line = new ProductionLine(10, 20);
+        ProductionLine line2 = new ProductionLine(10, 20);
+        SupplyTruck truck1 = new SupplyTruck(line);
+        ShippingTruck truck2 = new ShippingTruck(line);
+        Thread supplyThread = new Thread(() -> truck1.run());
+        Thread shippingThread = new Thread(() -> truck2.run());
+        supplyThread.start();
+        shippingThread.start();
+
+        while (true) {
+            line.produce();
+        }
+    }
+}
